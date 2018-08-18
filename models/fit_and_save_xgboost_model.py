@@ -4,6 +4,9 @@ import pickle
 from sklearn.model_selection import train_test_split
 import xgboost
 
+# If this doesn't work you probably need to add the following line to the end of your ~/.bashrc
+# export PYTHONPATH="${PYTHONPATH}:~/numerai/"
+from numerai.helpers import numeric_era_converter
 import numerapi
 
 DATA_DIRECTORY = os.path.expanduser("~/numerai_data/")
@@ -11,7 +14,6 @@ DATA_DIRECTORY = os.path.expanduser("~/numerai_data/")
 napi = numerapi.NumerAPI(verbosity="info")
 current_round = napi.get_current_round()
 PATH_TO_TRAINING_DATA = f'{DATA_DIRECTORY}numerai_dataset_{current_round}/numerai_training_data.csv'
-PATH_TO_TOURNAMENT_DATA = f'{DATA_DIRECTORY}numerai_dataset_{current_round}/numerai_tournament_data.csv'
 
 number_of_training_eras = current_round - 1
 
@@ -20,10 +22,6 @@ POSSIBLE_MARKETS = [
 ]
 
 TARGET_NAME = 'target_ken'
-
-def _numeric_era_converter(era_string):
-  return int(era_string.replace('era', ''))
-
 
 def _subset_training_data_by_era(training_df, era_numeric):
   if not isinstance(era_numeric, int):
@@ -47,10 +45,8 @@ def _construct_X_and_Y_for_training(training_df, target_name):
 
 
 full_training_df = pd.read_csv(PATH_TO_TRAINING_DATA, header = 0)
-full_tournament_df = pd.read_csv(PATH_TO_TOURNAMENT_DATA, header = 0)
 
-full_training_df['era_numeric'] = full_training_df['era'].apply(_numeric_era_converter)
-full_tournament_df['era_numeric'] = full_tournament_df['era'].apply(_numeric_era_converter)
+full_training_df['era_numeric'] = full_training_df['era'].apply(numeric_era_converter)
 
 
 # TODO: This subsetting is only necessary if we change number_of_training_eras
@@ -70,11 +66,8 @@ X_train, X_test, y_train, y_test = train_test_split(
   random_state=0
 )
 
-tournament_df_for_prediction = full_tournament_df.drop(['id', 'era', 'data_type'], axis=1)
-
 dtrain = xgboost.DMatrix(X_train, label=y_train)
 dtest = xgboost.DMatrix(X_test, label=y_test)
-dtournament = xgboost.DMatrix(tournament_df_for_prediction)
 
 num_round = 10
 params = {'max_depth': 5,
