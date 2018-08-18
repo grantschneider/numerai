@@ -7,7 +7,7 @@ import pandas as pd
 
 import numerapi
 
-DATA_DIRECTORY = os.path.expanduser("~/Dropbox/QuantFinance/Numerai/Data/")
+DATA_DIRECTORY = os.path.expanduser("~/numerai_data/")
 
 napi = numerapi.NumerAPI(verbosity="info")
 current_round = napi.get_current_round()
