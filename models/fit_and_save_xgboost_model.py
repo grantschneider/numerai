@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import pickle
 from sklearn.model_selection import train_test_split
 import xgboost
 
@@ -69,12 +70,13 @@ X_train, X_test, y_train, y_test = train_test_split(
   random_state=0
 )
 
+tournament_df_for_prediction = full_tournament_df.drop(['id', 'era', 'data_type'], axis=1)
+
 dtrain = xgboost.DMatrix(X_train, label=y_train)
 dtest = xgboost.DMatrix(X_test, label=y_test)
+dtournament = xgboost.DMatrix(tournament_df_for_prediction)
 
-gpu_res = {} # Store accuracy result
-
-num_round = 1000
+num_round = 10
 params = {'max_depth': 5,
           'learning_rate': 0.1,
           'objective': 'binary:logistic',
@@ -90,6 +92,13 @@ params = {'max_depth': 5,
           #'colsample_bytree': 0.33
           }
 
-bst = xgboost.train(params, dtrain, num_round, evals=[(dtest, 'test')], evals_result=gpu_res)
+bst = xgboost.train(params, dtrain, num_round, evals=[(dtest, 'test')])
+pickle.dump(
+  bst,
+  open(f'{DATA_DIRECTORY}numerai_dataset_{current_round}/xgboost_{TARGET_NAME}.pickle.dat',
+       'wb')
+)
 
-bst.predict(dtest)
+# TODO: Add checks for how good the model is
+
+
