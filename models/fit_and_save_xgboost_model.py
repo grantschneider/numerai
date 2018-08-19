@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import pickle
 from sklearn.model_selection import train_test_split
@@ -62,7 +63,8 @@ X_train, X_test, y_train, y_test = train_test_split(
 dtrain = xgboost.DMatrix(X_train, label=y_train)
 dtest = xgboost.DMatrix(X_test, label=y_test)
 
-num_round = 10
+num_round = 100
+results = {}
 params = {'max_depth': 5,
           'learning_rate': 0.1,
           'objective': 'binary:logistic',
@@ -78,7 +80,17 @@ params = {'max_depth': 5,
           #'colsample_bytree': 0.33
           }
 
-bst = xgboost.train(params, dtrain, num_round, evals=[(dtest, 'test')])
+bst = xgboost.train(
+  params, 
+  dtrain, 
+  num_round, 
+  evals=[(dtest, 'test')], 
+  evals_result=results
+)
+
+print(np.array(results['test']['error']).min())
+
+
 pickle.dump(
   bst,
   open(f'{DATA_DIRECTORY}numerai_dataset_{current_round}/xgboost_{TARGET_NAME}.pickle.dat',
