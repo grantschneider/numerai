@@ -1,4 +1,3 @@
-import os
 import pandas as pd
 import pickle
 from sklearn.model_selection import train_test_split
@@ -6,20 +5,14 @@ import xgboost
 
 # If this doesn't work you probably need to add the following line to the end of your ~/.bashrc
 # export PYTHONPATH="${PYTHONPATH}:~/numerai/"
-from numerai.helpers import numeric_era_converter
+from numerai.helpers import DATA_DIRECTORY, numeric_era_converter, POSSIBLE_MARKET_NAMES
 import numerapi
-
-DATA_DIRECTORY = os.path.expanduser("~/numerai_data/")
 
 napi = numerapi.NumerAPI(verbosity="info")
 current_round = napi.get_current_round()
 PATH_TO_TRAINING_DATA = f'{DATA_DIRECTORY}numerai_dataset_{current_round}/numerai_training_data.csv'
 
 number_of_training_eras = current_round - 1
-
-POSSIBLE_MARKETS = [
-  'target_bernie', 'target_charles', 'target_elizabeth', 'target_jordan', 'target_ken'
-]
 
 TARGET_NAME = 'target_ken'
 
@@ -34,11 +27,11 @@ def _subset_training_data_by_era(training_df, era_numeric):
 
 
 def _construct_X_and_Y_for_training(training_df, target_name):
-  if target_name not in POSSIBLE_MARKETS:
+  if target_name not in POSSIBLE_MARKET_NAMES:
     raise ValueError(
-      f'Expected the target name to be one of #{POSSIBLE_MARKETS}. Instead got #{target_name}.'
+      f'Expected the target name to be one of #{POSSIBLE_MARKET_NAMES}. Instead got #{target_name}.'
     )
-  targets_to_drop = list(set(POSSIBLE_MARKETS) - set([target_name]))
+  targets_to_drop = list(set(POSSIBLE_MARKET_NAMES) - set([target_name]))
   training_df_subsetted = training_df.copy()
   training_df_subsetted.drop(['id', 'era', 'data_type', *targets_to_drop], axis=1, inplace=True)
   return training_df_subsetted.drop([target_name], axis =1), training_df_subsetted[target_name]
