@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import pickle
+from sklearn.metrics import log_loss
 from sklearn.model_selection import GridSearchCV, train_test_split
 import xgboost
 
@@ -73,7 +74,7 @@ params = {'max_depth': 6,
           #'n_estimators': 1300,
           #'scale_pos_weight': 1,
           #'nthread': 1,
-          #'tree_method': 'gpu_hist',
+          'tree_method': 'gpu_hist', # comment this line out if not running xgboost on gpu
           #'gpu_id': 0,
           #'max_bin': 16,
           #'subsample': 0.66,
@@ -81,13 +82,20 @@ params = {'max_depth': 6,
           }
 
 bst = xgboost.train(
-  params, 
-  dtrain, 
-  num_round, 
-  evals=[(dtest, 'test')], 
+  params,
+  dtrain,
+  num_round,
+  evals=[(dtest, 'test')],
   evals_result=results
 )
 
+mean_test = np.mean(y_test)
+baseline_predictions = np.ones(y_test.shape) * mean_test
+
+
+ll_baseline = log_loss(y_test, baseline_predictions)
+print(ll_baseline)
+# 0.6931468803490528
 print(np.array(results['test']['error']).min())
 # 0.4761
 
@@ -101,15 +109,46 @@ pickle.dump(
 
 
 # TODO: move everything below to a different file; hyperparamter searching
-classifier = xgboost.XGBClassifier(objective='binary:logistic')
+# TODO: Follow https://www.analyticsvidhya.com/blog/2016/03/complete-guide-parameter-tuning-xgboost-with-codes-python/
+gridsearch_params = [
+    (max_depth, min_child_weight, learning_rate, gamma)
+    for max_depth in range(4,8)
+    for min_child_weight in range(5,8)
+    for learning_rate in np.linspace(0.02, 0.28, num=14)
+    for gamma in np.linspace(0, 0.6, num=7)
+]
 
-clf = GridSearchCV(
-  classifier,
-  {'max_depth': [2,4,6],
-  'n_estimators': [50,100,200]}, 
-  verbose=1, 
-  scoring='neg_log_loss'
-)
 
-clf.fit(X_train,y_train)
-clf.best_score_, clf.best_params_
+# Define initial best params and log loss
+min_ll = float("Inf")
+best_params = None
+for max_depth, min_child_weight, learning_rate, gamma in gridsearch_params:
+    print("CV with max_depth={}, min_child_weight={}, learning_rate={}, gamma={}".format(
+                             max_depth, min_child_weight, learning_rate, gamma
+                             ))
+    # Update our parameters
+    params['max_depth'] = max_depth
+    params['min_child_weight'] = min_child_weight
+    params['learning_rate'] = learning_rate
+    params['gamma'] = gamma
+    # Run CV
+    cv_results = xgboost.cv(
+        params,
+        dtrain,
+        num_boost_round=999,
+        seed=42,
+        nfold=5,
+        metrics={'auc', 'logloss'},
+        early_stopping_rounds=10
+    )
+    # Update best log loss
+    mean_ll = cv_results['test-logloss-mean'].min()
+    boost_rounds = cv_results['test-logloss-mean'].argmin()
+    print("\tlog loss {} for {} rounds".format(mean_ll, boost_rounds))
+    if mean_ll < min_ll:
+        min_ll = mean_ll
+        best_params = (max_depth, min_child_weight, learning_rate, gamma)
+
+print("Best params: {}, {}, {}, {} log-loss: {}".format(
+  best_params[0], best_params[1], best_params[2], best_params[3],
+  min_ll))
