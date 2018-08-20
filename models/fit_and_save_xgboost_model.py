@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import pickle
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GridSearchCV, train_test_split
 import xgboost
 
 # If this doesn't work you probably need to add the following line to the end of your ~/.bashrc
@@ -63,13 +63,13 @@ X_train, X_test, y_train, y_test = train_test_split(
 dtrain = xgboost.DMatrix(X_train, label=y_train)
 dtest = xgboost.DMatrix(X_test, label=y_test)
 
-num_round = 100
+num_round = 250
 results = {}
-params = {'max_depth': 5,
-          'learning_rate': 0.1,
+params = {'max_depth': 6,
+          'learning_rate': 0.15,
           'objective': 'binary:logistic',
           #'min_child_weight': 0.1,
-          #'gamma': 0.5,
+          'gamma': 0.4,
           #'n_estimators': 1300,
           #'scale_pos_weight': 1,
           #'nthread': 1,
@@ -89,7 +89,7 @@ bst = xgboost.train(
 )
 
 print(np.array(results['test']['error']).min())
-
+# 0.4761
 
 pickle.dump(
   bst,
@@ -100,3 +100,16 @@ pickle.dump(
 # TODO: Add checks for how good the model is
 
 
+# TODO: move everything below to a different file; hyperparamter searching
+classifier = xgboost.XGBClassifier(objective='binary:logistic')
+
+clf = GridSearchCV(
+  classifier,
+  {'max_depth': [2,4,6],
+  'n_estimators': [50,100,200]}, 
+  verbose=1, 
+  scoring='neg_log_loss'
+)
+
+clf.fit(X_train,y_train)
+clf.best_score_, clf.best_params_
