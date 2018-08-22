@@ -16,7 +16,7 @@ PATH_TO_TRAINING_DATA = f'{DATA_DIRECTORY}numerai_dataset_{current_round}/numera
 
 number_of_training_eras = current_round - 1
 
-TARGET_NAME = 'target_ken'
+TARGET_NAME = 'target_charles'
 
 def _subset_training_data_by_era(training_df, era_numeric):
   if not isinstance(era_numeric, int):
@@ -64,13 +64,20 @@ X_train, X_test, y_train, y_test = train_test_split(
 dtrain = xgboost.DMatrix(X_train, label=y_train)
 dtest = xgboost.DMatrix(X_test, label=y_test)
 
-num_round = 250
-results = {}
-params = {'max_depth': 6,
-          'learning_rate': 0.15,
+# TODO: Add checks for how good the model is
+
+# TODO: move hyperparameter tuning below to a different file
+# TODO: Follow https://www.analyticsvidhya.com/blog/2016/03/complete-guide-parameter-tuning-xgboost-with-codes-python/
+gridsearch_params = [
+    (max_depth, min_child_weight, learning_rate, gamma)
+    for max_depth in range(6,11)
+    for min_child_weight in range(6,11)
+    for learning_rate in np.linspace(0, 0.05, num=6)
+    for gamma in [0]#np.linspace(0, 6, num=3)
+]
+
+params_start = {
           'objective': 'binary:logistic',
-          #'min_child_weight': 0.1,
-          'gamma': 0.4,
           #'n_estimators': 1300,
           #'scale_pos_weight': 1,
           #'nthread': 1,
@@ -81,45 +88,9 @@ params = {'max_depth': 6,
           #'colsample_bytree': 0.33
           }
 
-bst = xgboost.train(
-  params,
-  dtrain,
-  num_round,
-  evals=[(dtest, 'test')],
-  evals_result=results
-)
-
-mean_test = np.mean(y_test)
-baseline_predictions = np.ones(y_test.shape) * mean_test
 
 
-ll_baseline = log_loss(y_test, baseline_predictions)
-print(ll_baseline)
-# 0.6931468803490528
-print(np.array(results['test']['error']).min())
-# 0.4761
-
-pickle.dump(
-  bst,
-  open(f'{DATA_DIRECTORY}numerai_dataset_{current_round}/xgboost_{TARGET_NAME}.pickle.dat',
-       'wb')
-)
-
-# TODO: Add checks for how good the model is
-
-
-# TODO: move everything below to a different file; hyperparamter searching
-# TODO: Follow https://www.analyticsvidhya.com/blog/2016/03/complete-guide-parameter-tuning-xgboost-with-codes-python/
-gridsearch_params = [
-    (max_depth, min_child_weight, learning_rate, gamma)
-    for max_depth in range(4,8)
-    for min_child_weight in range(5,8)
-    for learning_rate in np.linspace(0.02, 0.28, num=14)
-    for gamma in np.linspace(0, 0.6, num=7)
-]
-
-
-# Define initial best params and log loss
+# Find best params and log loss
 min_ll = float("Inf")
 best_params = None
 for max_depth, min_child_weight, learning_rate, gamma in gridsearch_params:
@@ -127,13 +98,13 @@ for max_depth, min_child_weight, learning_rate, gamma in gridsearch_params:
                              max_depth, min_child_weight, learning_rate, gamma
                              ))
     # Update our parameters
-    params['max_depth'] = max_depth
-    params['min_child_weight'] = min_child_weight
-    params['learning_rate'] = learning_rate
-    params['gamma'] = gamma
+    params_start['max_depth'] = max_depth
+    params_start['min_child_weight'] = min_child_weight
+    params_start['learning_rate'] = learning_rate
+    params_start['gamma'] = gamma
     # Run CV
     cv_results = xgboost.cv(
-        params,
+        params_start,
         dtrain,
         num_boost_round=999,
         seed=42,
@@ -152,3 +123,56 @@ for max_depth, min_child_weight, learning_rate, gamma in gridsearch_params:
 print("Best params: {}, {}, {}, {} log-loss: {}".format(
   best_params[0], best_params[1], best_params[2], best_params[3],
   min_ll))
+
+
+
+
+
+
+
+
+
+
+
+
+num_round = 209
+results = {}
+params_optimal = {'max_depth': 9,
+          'learning_rate': 0.02,
+          'objective': 'binary:logistic',
+          'min_child_weight': 10,
+          'gamma': 3,
+          #'n_estimators': 1300,
+          #'scale_pos_weight': 1,
+          #'nthread': 1,
+          'tree_method': 'gpu_hist', # comment this line out if not running xgboost on gpu
+          #'gpu_id': 0,
+          #'max_bin': 16,
+          #'subsample': 0.66,
+          #'colsample_bytree': 0.33
+          }
+
+bst = xgboost.train(
+  params_optimal,
+  dtrain,
+  num_round,
+  evals=[(dtest, 'test')],
+  evals_result=results
+)
+
+mean_test = np.mean(y_test)
+baseline_predictions = np.ones(y_test.shape) * mean_test
+bst_predictions = bst.predict(dtest)
+
+ll_baseline = log_loss(y_test, baseline_predictions)
+ll_bst = log_loss(y_test, bst_predictions)
+
+print(ll_baseline)
+print(ll_bst)
+
+pickle.dump(
+  bst,
+  open(f'{DATA_DIRECTORY}numerai_dataset_{current_round}/xgboost_{TARGET_NAME}.pickle.dat',
+       'wb')
+)
+
