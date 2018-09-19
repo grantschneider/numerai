@@ -129,6 +129,7 @@ results = {}
 params_optimal = {'max_depth': 6,
           'learning_rate': 0.04,
           'objective': 'binary:logistic',
+          'eval_metric': 'logloss',
           'min_child_weight': 10,
           'gamma': 0,
           #'n_estimators': 1300,
