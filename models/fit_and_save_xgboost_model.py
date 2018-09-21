@@ -17,7 +17,7 @@ PATH_TO_TRAINING_DATA = f'{DATA_DIRECTORY}numerai_dataset_{current_round}/numera
 number_of_training_eras = current_round - 1
 
 TARGET_NAME = 'target_charles'
-HYPERPARAMETER_OPTIMIZE = False
+HYPERPARAMETER_OPTIMIZE = True
 
 
 def _subset_training_data_by_era(training_df, era_numeric):
@@ -104,25 +104,29 @@ if HYPERPARAMETER_OPTIMIZE:
       params_start['learning_rate'] = learning_rate
       params_start['gamma'] = gamma
       # Run CV
-      cv_results = xgboost.cv(
+#      cv_results = xgboost.cv(
+      model = xgboost.train(
           params_start,
           dtrain,
-          num_boost_round=999,
-          seed=42,
-          nfold=5,
-          metrics={'auc', 'logloss'},
-          early_stopping_rounds=10
+#          num_boost_round=100,
+#          seed=42,
+#          nfold=5,
+#          metrics={'auc', 'logloss'},
+#          early_stopping_rounds=10
       )
       # Update best log loss
-      mean_ll = cv_results['test-logloss-mean'].min()
-      boost_rounds = cv_results['test-logloss-mean'].argmin()
+#      mean_ll = cv_results['test-logloss-mean'].min()
+      test_predictions = model.predict(dtest)
+      mean_ll = log_loss(y_test, test_predictions)
+#      boost_rounds = cv_results['test-logloss-mean'].argmin()
+      boost_rounds = 'NA'
       print("\tlog loss {} for {} rounds".format(mean_ll, boost_rounds))
       if mean_ll < min_ll:
           min_ll = mean_ll
           best_params = (max_depth, min_child_weight, learning_rate, gamma)
-  print("Best params: {}, {}, {}, {} log-loss: {}".format(
-    best_params[0], best_params[1], best_params[2], best_params[3],
-    min_ll))
+      print("Best params: {}, {}, {}, {} log-loss: {}".format(
+        best_params[0], best_params[1], best_params[2], best_params[3],
+        min_ll))
 
 num_round = 288
 results = {}
